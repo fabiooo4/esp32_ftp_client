@@ -8,6 +8,6 @@
 static const char *FTP_TAG = "FTP";
 
 esp_err_t connect_ftp_server(void) {
-  ESP_LOGI(FTP_TAG, "Todo: Implement FTP client");
+  ESP_LOGE(FTP_TAG, "Todo: Implement FTP client");
   return FTP_FAILURE;
 }

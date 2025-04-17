@@ -162,7 +162,7 @@ esp_err_t connect_wifi() {
     ESP_LOGI(WIFI_TAG, "Connected to AP");
     status = WIFI_SUCCESS;
   } else if (bits & WIFI_FAILURE) {
-    ESP_LOGI(WIFI_TAG, "Failed to connect to AP");
+    ESP_LOGE(WIFI_TAG, "Failed to connect to AP");
     status = WIFI_FAILURE;
   } else {
     ESP_LOGE(WIFI_TAG, "Unexpected event");

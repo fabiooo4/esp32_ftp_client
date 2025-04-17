@@ -24,7 +24,7 @@ void app_main(void) {
   // Connect to AP
   status = connect_wifi();
   if (WIFI_SUCCESS != status) {
-    ESP_LOGI(WIFI_TAG, "Failed to associate to AP, dying...");
+    ESP_LOGE(WIFI_TAG, "Failed to associate to AP, dying...");
     return;
   }
   // ---- Wifi setup ---------------------------------------------------
@@ -71,7 +71,7 @@ void app_main(void) {
 
   status = connect_ftp_server();
   if (WIFI_SUCCESS != status) {
-    ESP_LOGI(WIFI_TAG, "Failed to connect to remote server, dying...");
+    ESP_LOGE(WIFI_TAG, "Failed to connect to remote server, dying...");
     return;
   }
 }
