@@ -1,4 +1,7 @@
 #include "esp_err.h"
+#include "ftp.c"
+#include "nvs_flash.h"
+#include "wifi.c"
 #include <esp_log.h>
 #include <esp_spiffs.h>
 #include <stdio.h>
@@ -6,7 +9,27 @@
 static const char *FS_TAG = "Filesystem setup";
 
 void app_main(void) {
-  // Filesystem setup
+  // ---- Wifi setup ---------------------------------------------------
+  esp_err_t status = WIFI_FAILURE;
+
+  // Initialize storage
+  esp_err_t res = nvs_flash_init();
+  if (res == ESP_ERR_NVS_NO_FREE_PAGES ||
+      res == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+    ESP_ERROR_CHECK(nvs_flash_erase());
+    res = nvs_flash_init();
+  }
+  ESP_ERROR_CHECK(res);
+
+  // Connect to AP
+  status = connect_wifi();
+  if (WIFI_SUCCESS != status) {
+    ESP_LOGI(WIFI_TAG, "Failed to associate to AP, dying...");
+    return;
+  }
+  // ---- Wifi setup ---------------------------------------------------
+
+  // ---- Filesystem setup ---------------------------------------------
   esp_vfs_spiffs_conf_t spiffs_conf = {
       .base_path = "/storage",
       .partition_label = NULL,
@@ -20,6 +43,7 @@ void app_main(void) {
              esp_err_to_name(result));
     return;
   }
+  // ---- Filesystem setup ---------------------------------------------
 
   // Free space calculation
   size_t total = 0, used = 0;
@@ -39,9 +63,15 @@ void app_main(void) {
     return;
   }
 
-  char line[13];
+  char line[32];
   fgets(line, sizeof(line), fd);
 
   fclose(fd);
   printf("%s\n", line);
+
+  status = connect_ftp_server();
+  if (WIFI_SUCCESS != status) {
+    ESP_LOGI(WIFI_TAG, "Failed to connect to remote server, dying...");
+    return;
+  }
 }
