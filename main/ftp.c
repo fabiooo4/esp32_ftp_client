@@ -21,10 +21,8 @@ esp_err_t connect_ftp_server(void) {
   ESP_LOGI(FTP_TAG, "FTP User     : %s", FTP_USER);
 
   static NetBuf_t *ftpClientNetBuf = NULL;
-  FtpClient *ftpClient = getFtpClient();
 
-  int connect =
-      ftpClient->FtpConnect(FTP_SERVER_IP, FTP_SERVER_PORT, &ftpClientNetBuf);
+  int connect = FtpConnect(FTP_SERVER_IP, FTP_SERVER_PORT, &ftpClientNetBuf);
 
   ESP_LOGI(FTP_TAG, "connect=%d", connect);
   if (connect == 0) {
@@ -33,7 +31,7 @@ esp_err_t connect_ftp_server(void) {
   }
 
   // Login FTP server
-  int login = ftpClient->FtpLogin(FTP_USER, FTP_PASSWORD, ftpClientNetBuf);
+  int login = FtpLogin(FTP_USER, FTP_PASSWORD, ftpClientNetBuf);
 
   ESP_LOGI(FTP_TAG, "login=%d", login);
 

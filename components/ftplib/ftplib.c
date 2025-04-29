@@ -62,9 +62,6 @@ struct NetBuf {
 	char response[FTPLIB_RESPONSE_BUFFER_SIZE];
 };
 
-static bool isInitilized = false;
-static FtpClient ftpClient_;
-
 /*Internal use functions*/
 static int socketWait(NetBuf_t* ctl);
 static int readResponse(char c, NetBuf_t* nControl);
@@ -75,47 +72,6 @@ static int xfer(const char* localfile, const char* path,
 static int openPort(NetBuf_t* nControl, NetBuf_t** nData, int mode, int dir);
 static int writeLine(const char* buf, int len, NetBuf_t* nData);
 static int acceptConnection(NetBuf_t* nData, NetBuf_t* nControl);
-
-/*Miscellaneous Functions*/
-static int siteFtpClient(const char* cmd, NetBuf_t* nControl);
-static char* getLastResponseFtpClient(NetBuf_t* nControl);
-static int getSysTypeFtpClient(char* buf, int max, NetBuf_t* nControl);
-static int getFileSizeFtpClient(const char* path,
-	unsigned int* size, char mode, NetBuf_t* nControl);
-static int getModDateFtpClient(const char* path, char* dt,
-	int max, NetBuf_t* nControl);
-static int setCallbackFtpClient(const FtpCallbackOptions_t* opt, NetBuf_t* nControl);
-static int clearCallbackFtpClient(NetBuf_t* nControl);
-/*Server connection*/
-static int connectFtpClient(const char* host, uint16_t port, NetBuf_t** nControl);
-static int loginFtpClient(const char* user, const char* pass, NetBuf_t* nControl);
-static void quitFtpClient(NetBuf_t* nControl);
-static int setOptionsFtpClient(int opt, long val, NetBuf_t* nControl);
-/*Directory Functions*/
-static int changeDirFtpClient(const char* path, NetBuf_t* nControl);
-static int makeDirFtpClient(const char* path, NetBuf_t* nControl);
-static int removeDirFtpClient(const char* path, NetBuf_t* nControl);
-static int dirFtpClient(const char* outputfile, const char* path, NetBuf_t* nControl);
-static int nlstFtpClient(const char* outputfile, const char* path,
-	NetBuf_t* nControl);
-static int mlsdFtpClient(const char* outputfile, const char* path,
-	NetBuf_t* nControl);
-static int changeDirUpFtpClient(NetBuf_t* nControl);
-static int pwdFtpClient(char* path, int max, NetBuf_t* nControl);
-/*File to File Transfer*/
-static int getDataFtpClient(const char* outputfile, const char* path,
-	char mode, NetBuf_t* nControl);
-static int putDataFtpClient(const char* inputfile, const char* path, char mode,
-	NetBuf_t* nControl);
-static int deleteDataFtpClient(const char* fnm, NetBuf_t* nControl);
-static int renameFtpClient(const char* src, const char* dst, NetBuf_t* nControl);
-/*File to Program Transfer*/
-static int accessFtpClient(const char* path, int typ, int mode, NetBuf_t* nControl,
-	NetBuf_t** nData);
-static int readFtpClient(void* buf, int max, NetBuf_t* nData);
-static int writeFtpClient(const void* buf, int len, NetBuf_t* nData);
-static int closeFtpClient(NetBuf_t* nData);
-
 
 /*
  * socket_wait - wait for socket to receive or flush data
@@ -334,7 +290,7 @@ static int xfer(const char* localfile, const char* path,
 	}
 	if(local == NULL)
 		local = (typ == FTPLIB_FILE_WRITE) ? stdin : stdout;
-	if (!accessFtpClient(path, typ, mode, nControl, &nData)) {
+	if (!FtpAccess(path, typ, mode, nControl, &nData)) {
 		if (localfile) {
 			fclose(local);
 			if (typ == FTPLIB_FILE_READ)
@@ -349,7 +305,7 @@ static int xfer(const char* localfile, const char* path,
 	if (dbuf != NULL) {
 		if (typ == FTPLIB_FILE_WRITE) {
 			while ((l = fread(dbuf, 1, FTPLIB_BUFFER_SIZE, local)) > 0) {
-				int c = writeFtpClient(dbuf, l, nData);
+				int c = FtpWrite(dbuf, l, nData);
 				if (c < l) {
 					#if FTPLIB_DEBUG
 					//printf("Ftp Client xfer short write: passed %d, wrote %d\n", l, c);
@@ -363,7 +319,7 @@ static int xfer(const char* localfile, const char* path,
 			}
 		}
 		else {
-			while ((l = readFtpClient(dbuf, FTPLIB_BUFFER_SIZE, nData)) > 0) {
+			while ((l = FtpRead(dbuf, FTPLIB_BUFFER_SIZE, nData)) > 0) {
 				if (fwrite(dbuf, 1, l, local) == 0) {
 					#if FTPLIB_DEBUG
 					perror("FTP Client xfer localfile write");
@@ -386,7 +342,7 @@ static int xfer(const char* localfile, const char* path,
 		if(rv != 1)
 			unlink(localfile);
 	}
-	closeFtpClient(nData);
+	FtpClose(nData);
 	return rv;
 }
 
@@ -655,11 +611,11 @@ static int acceptConnection(NetBuf_t* nData, NetBuf_t* nControl)
 
 
 /*
- * siteFtpClient - send a SITE command
+ * FtpSite - send a SITE command
  *
  * return 1 if command successful, 0 otherwise
  */
-static int siteFtpClient(const char* cmd, NetBuf_t* nControl)
+int FtpSite(const char* cmd, NetBuf_t* nControl)
 {
 	char buf[FTPLIB_TEMP_BUFFER_SIZE];
 	if ((strlen(cmd) + 7) > sizeof(buf))
@@ -674,9 +630,9 @@ static int siteFtpClient(const char* cmd, NetBuf_t* nControl)
 
 
 /*
- * getLastResponseFtpClient - return a pointer to the last response received
+ * FtpGetLastResponse - return a pointer to the last response received
  */
-static char* getLastResponseFtpClient(NetBuf_t* nControl)
+char* FtpGetLastResponse(NetBuf_t* nControl)
 {
 	if ((nControl) && (nControl->dir == FTPLIB_CONTROL))
 		return nControl->response;
@@ -687,7 +643,7 @@ static char* getLastResponseFtpClient(NetBuf_t* nControl)
 
 
 /*
- * getSysTypeFtpClient - send a SYST command
+ * FtpGetSysType - send a SYST command
  *
  * Fills in the user buffer with the remote system type.  If more
  * information from the response is required, the user can parse
@@ -695,7 +651,7 @@ static char* getLastResponseFtpClient(NetBuf_t* nControl)
  *
  * return 1 if command successful, 0 otherwise
  */
-static int getSysTypeFtpClient(char* buf, int max, NetBuf_t* nControl)
+int FtpGetSysType(char* buf, int max, NetBuf_t* nControl)
 {
 	if (!sendCommand("SYST", '2', nControl))
 		return 0;
@@ -711,11 +667,11 @@ static int getSysTypeFtpClient(char* buf, int max, NetBuf_t* nControl)
 
 
 /*
- * getFileSizeFtpClient - determine the size of a remote file
+ * FtpGetFileSize - determine the size of a remote file
  *
  * return 1 if successful, 0 otherwise
  */
-static int getFileSizeFtpClient(const char* path,
+int FtpGetFileSize(const char* path,
 		unsigned int* size, char mode, NetBuf_t* nControl)
 {
 	char cmd[FTPLIB_TEMP_BUFFER_SIZE];
@@ -742,11 +698,11 @@ static int getFileSizeFtpClient(const char* path,
 
 
 /*
- * getModDateFtpClient - determine the modification date of a remote file
+ * FtpGetModDate - determine the modification date of a remote file
  *
  * return 1 if successful, 0 otherwise
  */
-static int getModDateFtpClient(const char* path, char* dt,
+int FtpGetModDate(const char* path, char* dt,
 		int max, NetBuf_t* nControl)
 {
 	char buf[FTPLIB_TEMP_BUFFER_SIZE];
@@ -763,7 +719,7 @@ static int getModDateFtpClient(const char* path, char* dt,
 
 
 
-static int setCallbackFtpClient(const FtpCallbackOptions_t* opt, NetBuf_t* nControl)
+int FtpSetCallback(const FtpCallbackOptions_t* opt, NetBuf_t* nControl)
 {
    nControl->idlecb = opt->cbFunc;
    nControl->idlearg = opt->cbArg;
@@ -775,7 +731,7 @@ static int setCallbackFtpClient(const FtpCallbackOptions_t* opt, NetBuf_t* nCont
 
 
 
-static int clearCallbackFtpClient(NetBuf_t* nControl)
+int FtpClearCallback(NetBuf_t* nControl)
 {
    nControl->idlecb = NULL;
    nControl->idlearg = NULL;
@@ -788,11 +744,11 @@ static int clearCallbackFtpClient(NetBuf_t* nControl)
 
 
 /*
- * connect - connect to remote server
+ * FtpConnect - connect to remote server
  *
  * return 1 if connected, 0 if not
  */
-static int connectFtpClient(const char* host, uint16_t port, NetBuf_t** nControl)
+int FtpConnect(const char* host, uint16_t port, NetBuf_t** nControl)
 {
 	ESP_LOGD(__FUNCTION__, "host=%s", host);
 	struct sockaddr_in sin;
@@ -870,11 +826,11 @@ static int connectFtpClient(const char* host, uint16_t port, NetBuf_t** nControl
 }
 
 /*
- * login - log in to remote server
+ * FtpLogin - log in to remote server
  *
  * return 1 if logged in, 0 otherwise
  */
-static int loginFtpClient(const char* user, const char* pass, NetBuf_t* nControl)
+int FtpLogin(const char* user, const char* pass, NetBuf_t* nControl)
 {
 	char tempbuf[64];
 	if (((strlen(user) + 7) > sizeof(tempbuf)) ||
@@ -893,11 +849,11 @@ static int loginFtpClient(const char* user, const char* pass, NetBuf_t* nControl
 
 
 /*
- * quitFtpClient - disconnect from remote
+ * FtpQuit - disconnect from remote
  *
  * return 1 if successful, 0 otherwise
  */
-static void quitFtpClient(NetBuf_t* nControl)
+void FtpQuit(NetBuf_t* nControl)
 {
 	if (nControl->dir != FTPLIB_CONTROL)
 		return;
@@ -910,11 +866,11 @@ static void quitFtpClient(NetBuf_t* nControl)
 
 
 /*
- * setOptionsFtpClient - change connection options
+ * FtpSetOptions - change connection options
  *
  * returns 1 if successful, 0 on error
  */
-static int setOptionsFtpClient(int opt, long val, NetBuf_t* nControl)
+int FtpSetOptions(int opt, long val, NetBuf_t* nControl)
 {
 	int v,rv = 0;
 	switch (opt)
@@ -966,11 +922,11 @@ static int setOptionsFtpClient(int opt, long val, NetBuf_t* nControl)
 
 
 /*
- * changeDirFtpClient - change path at remote
+ * FtpChangeDir - change path at remote
  *
  * return 1 if successful, 0 otherwise
  */
-static int changeDirFtpClient(const char* path, NetBuf_t* nControl)
+int FtpChangeDir(const char* path, NetBuf_t* nControl)
 {
 	char buf[FTPLIB_TEMP_BUFFER_SIZE];
 	if ((strlen(path) + 6) > sizeof(buf))
@@ -985,11 +941,11 @@ static int changeDirFtpClient(const char* path, NetBuf_t* nControl)
 
 
 /*
- * makeDirFtpClient - create a directory at server
+ * FtpMakeDir - create a directory at server
  *
  * return 1 if successful, 0 otherwise
  */
-static int makeDirFtpClient(const char* path, NetBuf_t* nControl)
+int FtpMakeDir(const char* path, NetBuf_t* nControl)
 {
 	char buf[FTPLIB_TEMP_BUFFER_SIZE];
 	if ((strlen(path) + 6) > sizeof(buf))
@@ -1004,11 +960,11 @@ static int makeDirFtpClient(const char* path, NetBuf_t* nControl)
 
 
 /*
- * removeDirFtpClient - remove directory at remote
+ * FtpRemoveDir - remove directory at remote
  *
  * return 1 if successful, 0 otherwise
  */
-static int removeDirFtpClient(const char* path, NetBuf_t* nControl)
+int FtpRemoveDir(const char* path, NetBuf_t* nControl)
 {
 	char buf[FTPLIB_TEMP_BUFFER_SIZE];
 	if ((strlen(path) + 6) > sizeof(buf))
@@ -1023,11 +979,11 @@ static int removeDirFtpClient(const char* path, NetBuf_t* nControl)
 
 
 /*
- * dirFtpClient - issue a LIST command and write response to output
+ * FtpDir - issue a LIST command and write response to output
  *
  * return 1 if successful, 0 otherwise
  */
-static int dirFtpClient(const char* outputfile, const char* path, NetBuf_t* nControl)
+int FtpDir(const char* outputfile, const char* path, NetBuf_t* nControl)
 {
 	return xfer(outputfile, path, nControl, FTPLIB_DIR_VERBOSE, FTPLIB_ASCII);
 }
@@ -1035,11 +991,11 @@ static int dirFtpClient(const char* outputfile, const char* path, NetBuf_t* nCon
 
 
 /*
- * nlstFtpClient - issue an NLST command and write response to output
+ * FtpNlst - issue an NLST command and write response to output
  *
  * return 1 if successful, 0 otherwise
  */
-static int nlstFtpClient(const char* outputfile, const char* path,
+int FtpNlst(const char* outputfile, const char* path,
 	NetBuf_t* nControl)
 {
 	return xfer(outputfile, path, nControl, FTPLIB_DIR, FTPLIB_ASCII);
@@ -1048,11 +1004,11 @@ static int nlstFtpClient(const char* outputfile, const char* path,
 
 
 /*
- * nlstFtpClient - issue an MLSD command and write response to output
+ * FtpNlsd - issue an MLSD command and write response to output
  *
  * return 1 if successful, 0 otherwise
  */
-static int mlsdFtpClient(const char* outputfile, const char* path,
+int FtpMlsd(const char* outputfile, const char* path,
 	NetBuf_t* nControl)
 {
 	return xfer(outputfile, path, nControl, FTPLIB_MLSD, FTPLIB_ASCII);
@@ -1061,11 +1017,11 @@ static int mlsdFtpClient(const char* outputfile, const char* path,
 
 
 /*
- * changeDirUpFtpClient - move to parent directory at remote
+ * FtpChangeDirUp - move to parent directory at remote
  *
  * return 1 if successful, 0 otherwise
  */
-static int changeDirUpFtpClient(NetBuf_t* nControl)
+int FtpChangeDirUp(NetBuf_t* nControl)
 {
 	if (!sendCommand("CDUP", '2', nControl))
 		return 0;
@@ -1075,11 +1031,11 @@ static int changeDirUpFtpClient(NetBuf_t* nControl)
 
 
 /*
- * pwdFtpClient - get working directory at remote
+ * FtpPwd - get working directory at remote
  *
  * return 1 if successful, 0 otherwise
  */
-static int pwdFtpClient(char* path, int max, NetBuf_t* nControl)
+int FtpPwd(char* path, int max, NetBuf_t* nControl)
 {
 	if (!sendCommand("PWD",'2',nControl))
 		return 0;
@@ -1098,11 +1054,11 @@ static int pwdFtpClient(char* path, int max, NetBuf_t* nControl)
 
 
 /*
- * getDataFtpClient - issue a GET command and write received data to output
+ * FtpGet - issue a GET command and write received data to output
  *
  * return 1 if successful, 0 otherwise
  */
-static int getDataFtpClient(const char* outputfile, const char* path,
+int FtpGet(const char* outputfile, const char* path,
 		char mode, NetBuf_t* nControl)
 {
 	return xfer(outputfile, path, nControl, FTPLIB_FILE_READ, mode);
@@ -1111,11 +1067,11 @@ static int getDataFtpClient(const char* outputfile, const char* path,
 
 
 /*
- * putDataFtpClient - issue a PUT command and send data from input
+ * FtpPut - issue a PUT command and send data from input
  *
  * return 1 if successful, 0 otherwise
  */
-static int putDataFtpClient(const char* inputfile, const char* path, char mode,
+int FtpPut(const char* inputfile, const char* path, char mode,
 	NetBuf_t* nControl)
 {
 	return xfer(inputfile, path, nControl, FTPLIB_FILE_WRITE, mode);
@@ -1124,11 +1080,11 @@ static int putDataFtpClient(const char* inputfile, const char* path, char mode,
 
 
 /*
- * deleteFtpClient - delete a file at remote
+ * FtpDelete - delete a file at remote
  *
  * return 1 if successful, 0 otherwise
  */
-static int deleteDataFtpClient(const char* fnm, NetBuf_t* nControl)
+int FtpDelete(const char* fnm, NetBuf_t* nControl)
 {
 	char cmd[FTPLIB_TEMP_BUFFER_SIZE];
 	if ((strlen(fnm) + 7) > sizeof(cmd))
@@ -1143,11 +1099,11 @@ static int deleteDataFtpClient(const char* fnm, NetBuf_t* nControl)
 
 
 /*
- * renameFtpClient - rename a file at remote
+ * FtpRename - rename a file at remote
  *
  * return 1 if successful, 0 otherwise
  */
-static int renameFtpClient(const char* src, const char* dst, NetBuf_t* nControl)
+int FtpRename(const char* src, const char* dst, NetBuf_t* nControl)
 {
 	char cmd[FTPLIB_TEMP_BUFFER_SIZE];
 	if (((strlen(src) + 7) > sizeof(cmd)) ||
@@ -1166,11 +1122,11 @@ static int renameFtpClient(const char* src, const char* dst, NetBuf_t* nControl)
 
 
 /*
- * accessFtpClient - return a handle for a data stream
+ * FtpAccess - return a handle for a data stream
  *
  * return 1 if successful, 0 otherwise
  */
-static int accessFtpClient(const char* path, int typ, int mode, NetBuf_t* nControl,
+int FtpAccess(const char* path, int typ, int mode, NetBuf_t* nControl,
 	NetBuf_t** nData)
 {
 	if ((path == NULL) &&
@@ -1238,13 +1194,13 @@ static int accessFtpClient(const char* path, int typ, int mode, NetBuf_t* nContr
 	if (openPort(nControl, nData, mode, dir) == -1)
 		return 0;
 	if (!sendCommand(buf, '1', nControl)) {
-		closeFtpClient(*nData);
+		FtpClose(*nData);
 		*nData = NULL;
 		return 0;
 	}
 	if (nControl->cmode == FTPLIB_ACTIVE) {
 		if (!acceptConnection(*nData,nControl)) {
-			closeFtpClient(*nData);
+			FtpClose(*nData);
 			*nData = NULL;
 			nControl->data = NULL;
 			return 0;
@@ -1256,9 +1212,9 @@ static int accessFtpClient(const char* path, int typ, int mode, NetBuf_t* nContr
 
 
 /*
- * readFtpClient - read from a data connection
+ * FtpRead - read from a data connection
  */
-static int readFtpClient(void* buf, int max, NetBuf_t* nData)
+int FtpRead(void* buf, int max, NetBuf_t* nData)
 {
 	if (nData->dir != FTPLIB_READ)
 		return 0;
@@ -1289,9 +1245,9 @@ static int readFtpClient(void* buf, int max, NetBuf_t* nData)
 
 
 /*
- * writeFtpClient - write to a data connection
+ * FtpWrite - write to a data connection
  */
-static int writeFtpClient(const void* buf, int len, NetBuf_t* nData)
+int FtpWrite(const void* buf, int len, NetBuf_t* nData)
 {
 	int i = 0;
 	if (nData->dir != FTPLIB_WRITE)
@@ -1318,9 +1274,9 @@ static int writeFtpClient(const void* buf, int len, NetBuf_t* nData)
 
 
 /*
- * closeFtpClient - close a data connection
+ * FtpClose - close a data connection
  */
-static int closeFtpClient(NetBuf_t* nData)
+int FtpClose(NetBuf_t* nData)
 {
 	switch (nData->dir)
 	{
@@ -1340,48 +1296,11 @@ static int closeFtpClient(NetBuf_t* nData)
 		case FTPLIB_CONTROL:
 			if (nData->data) {
 				nData->ctrl = NULL;
-				closeFtpClient(nData->data);
+				FtpClose(nData->data);
 			}
 			closesocket(nData->handle);
 			free(nData);
 			return 0;
 	}
 	return 1;
-}
-
-
-
-FtpClient* getFtpClient(void)
-{
-	if(!isInitilized) {
-		ftpClient_.FtpSite = siteFtpClient;
-		ftpClient_.FtpGetLastResponse = getLastResponseFtpClient;
-		ftpClient_.FtpGetSysType = getSysTypeFtpClient;
-		ftpClient_.FtpGetFileSize = getFileSizeFtpClient;
-		ftpClient_.FtpGetModDate = getModDateFtpClient;
-		ftpClient_.FtpSetCallback = setCallbackFtpClient;
-		ftpClient_.FtpClearCallback = clearCallbackFtpClient;
-		ftpClient_.FtpConnect = connectFtpClient;
-		ftpClient_.FtpLogin = loginFtpClient;
-		ftpClient_.FtpQuit = quitFtpClient;
-		ftpClient_.FtpSetOptions = setOptionsFtpClient;
-		ftpClient_.FtpChangeDir = changeDirFtpClient;
-		ftpClient_.FtpMakeDir = makeDirFtpClient;
-		ftpClient_.FtpRemoveDir = removeDirFtpClient;
-		ftpClient_.FtpDir = dirFtpClient;
-		ftpClient_.FtpNlst = nlstFtpClient;
-		ftpClient_.FtpMlsd = mlsdFtpClient;
-		ftpClient_.FtpChangeDirUp = changeDirUpFtpClient;
-		ftpClient_.FtpPwd = pwdFtpClient;
-		ftpClient_.FtpGet = getDataFtpClient;
-		ftpClient_.FtpPut = putDataFtpClient;
-		ftpClient_.FtpDelete = deleteDataFtpClient;
-		ftpClient_.FtpRename = renameFtpClient;
-		ftpClient_.FtpAccess = accessFtpClient;
-		ftpClient_.FtpRead = readFtpClient;
-		ftpClient_.FtpWrite = writeFtpClient;
-		ftpClient_.FtpClose = closeFtpClient;
-		isInitilized = true;
-	}
-	return &ftpClient_;
 }
