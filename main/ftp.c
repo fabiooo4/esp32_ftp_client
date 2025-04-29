@@ -2,6 +2,13 @@
 #include "esp_err.h"
 #include "esp_log.h"
 
+// Menuconfig ----------------------------
+#define FTP_SERVER_IP CONFIG_FTP_SERVER_IP
+#define FTP_SERVER_PORT CONFIG_FTP_SERVER_PORT
+#define FTP_USER CONFIG_FTP_SERVER_USER
+#define FTP_PASSWORD CONFIG_FTP_SERVER_PASSWORD
+// Menuconfig ----------------------------
+
 #define FTP_SUCCESS BIT0
 #define FTP_FAILURE BIT1
 
