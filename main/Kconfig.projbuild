@@ -75,8 +75,8 @@ menu "FTP Client configuration"
               IP address of the FTP server.
 
       config FTP_SERVER_PORT
-          string "Server Port"
-          default "21"
+          int "Server Port"
+          default 21
           help
               Port number of the FTP server.
 
