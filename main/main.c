@@ -71,7 +71,7 @@ void app_main(void) {
 
   status = connect_ftp_server();
   if (WIFI_SUCCESS != status) {
-    ESP_LOGE(WIFI_TAG, "Failed to connect to remote server, dying...");
+    ESP_LOGE(FTP_TAG, "Failed to connect to FTP server, dying...");
     return;
   }
 }

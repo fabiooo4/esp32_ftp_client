@@ -2,6 +2,8 @@
 #include "esp_err.h"
 #include "esp_log.h"
 #include "ftplib.h"
+#include <stdio.h>
+#include <stdlib.h>
 
 // Menuconfig ----------------------------
 #define FTP_SERVER_IP CONFIG_FTP_SERVER_IP
@@ -14,31 +16,59 @@
 #define FTP_FAILURE BIT1
 
 static const char *FTP_TAG = "FTP";
+static NetBuf_t *ftp_connection = NULL;
+
+void error(char *message) {
+  ESP_LOGE(FTP_TAG, "%s: %s", message, FtpGetLastResponse(ftp_connection));
+}
 
 esp_err_t connect_ftp_server(void) {
   // Open FTP server
   ESP_LOGI(FTP_TAG, "FTP Server IP: %s", FTP_SERVER_IP);
   ESP_LOGI(FTP_TAG, "FTP User     : %s", FTP_USER);
 
-  static NetBuf_t *ftpClientNetBuf = NULL;
-
-  int connect = FtpConnect(FTP_SERVER_IP, FTP_SERVER_PORT, &ftpClientNetBuf);
-
-  ESP_LOGI(FTP_TAG, "connect=%d", connect);
-  if (connect == 0) {
-    ESP_LOGE(FTP_TAG, "FTP server connect fail");
+  // Connect to FTP server
+  if (!FtpConnect(FTP_SERVER_IP, FTP_SERVER_PORT, &ftp_connection)) {
+    error("Connection failed");
     return FTP_FAILURE;
   }
+  ESP_LOGI(FTP_TAG, "Connected to FTP");
+  ESP_LOGI(FTP_TAG, "%s", FtpGetLastResponse(ftp_connection));
 
-  // Login FTP server
-  int login = FtpLogin(FTP_USER, FTP_PASSWORD, ftpClientNetBuf);
-
-  ESP_LOGI(FTP_TAG, "login=%d", login);
-
-  if (login == 0) {
-    ESP_LOGE(FTP_TAG, "FTP server login fail");
+  // Login to FTP server
+  if (!FtpLogin(FTP_USER, FTP_PASSWORD, ftp_connection)) {
+    error("Login failed");
     return FTP_FAILURE;
   }
+  ESP_LOGI(FTP_TAG, "Logged in to FTP");
+  ESP_LOGI(FTP_TAG, "%s", FtpGetLastResponse(ftp_connection));
+
+  unsigned int size = 0;
+  if (!FtpGetFileSize("test.txt", &size, FTPLIB_ASCII, ftp_connection)) {
+    error("GetSize failed");
+    return FTP_FAILURE;
+  }
+  ESP_LOGI(FTP_TAG, "%s", FtpGetLastResponse(ftp_connection));
+
+  /* if (!FtpGet("/storage/text.txt", "test.txt", FTPLIB_ASCII, ftp_connection))
+  { error("GET failed"); return FTP_FAILURE;
+  }
+  ESP_LOGI(FTP_TAG, "%s", FtpGetLastResponse(ftp_connection)); */
+
+  /* // ls
+  if (!FtpDir("/storage/ls", "", ftp_connection)) {
+    ESP_LOGE(FTP_TAG, "Failed to list remote directory");
+    error("Failed to list remote directory");
+    return FTP_FAILURE;
+  } */
+
+  /* // Print the contents of a remote file
+  char *textfile = "test.txt";
+  printf("\nContents of %s:\n", textfile);
+  if (!FtpGet(NULL, "test.txt", FTPLIB_ASCII, ftp_connection)) {
+    ESP_LOGE(FTP_TAG, "Failed to retrieve the remote file");
+    return FTP_FAILURE;
+  } */
 
   return FTP_SUCCESS;
 }
