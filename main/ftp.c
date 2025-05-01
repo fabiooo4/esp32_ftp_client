@@ -43,32 +43,20 @@ esp_err_t connect_ftp_server(void) {
   ESP_LOGI(FTP_TAG, "Logged in to FTP");
   ESP_LOGI(FTP_TAG, "%s", FtpGetLastResponse(ftp_connection));
 
-  unsigned int size = 0;
-  if (!FtpGetFileSize("test.txt", &size, FTPLIB_ASCII, ftp_connection)) {
-    error("GetSize failed");
-    return FTP_FAILURE;
-  }
-  ESP_LOGI(FTP_TAG, "%s", FtpGetLastResponse(ftp_connection));
-
-  /* if (!FtpGet("/storage/text.txt", "test.txt", FTPLIB_ASCII, ftp_connection))
-  { error("GET failed"); return FTP_FAILURE;
-  }
-  ESP_LOGI(FTP_TAG, "%s", FtpGetLastResponse(ftp_connection)); */
-
-  /* // ls
-  if (!FtpDir("/storage/ls", "", ftp_connection)) {
+  // ls
+  if (!FtpDir(NULL, ".", ftp_connection)) {
     ESP_LOGE(FTP_TAG, "Failed to list remote directory");
     error("Failed to list remote directory");
     return FTP_FAILURE;
-  } */
+  }
 
-  /* // Print the contents of a remote file
+  // Print the contents of a remote file
   char *textfile = "test.txt";
   printf("\nContents of %s:\n", textfile);
   if (!FtpGet(NULL, "test.txt", FTPLIB_ASCII, ftp_connection)) {
     ESP_LOGE(FTP_TAG, "Failed to retrieve the remote file");
     return FTP_FAILURE;
-  } */
+  }
 
   return FTP_SUCCESS;
 }
