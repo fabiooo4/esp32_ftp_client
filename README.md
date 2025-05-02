@@ -66,6 +66,7 @@ in `FTP Server authentication` menu.
 - [Custom partition table](#custom-partition-table)
   - [Create filesystem images from the contents of a host folder](#create-filesystem-images-from-the-contents-of-a-host-folder)
 - [Wifi setup](#wifi-setup)
+- [Stack size](#stack-size)
 
 ### Flash size
 
