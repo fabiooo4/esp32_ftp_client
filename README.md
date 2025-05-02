@@ -109,6 +109,36 @@ the app binaries, partition tables, etc. on `idf.py flash` by specifying
 spiffs_create_partition_image(my_spiffs_partition my_folder FLASH_IN_PROJECT)
 ```
 
+### Stack size
+In `Component config/ESP System Settings/Main Task Stack Size` has been set to 
+`5120` bytes to prevent stack overflow errors due to large data buffers.
+
+## Testing ftplib
+This code is tested with the following steps:
+1. Connect to the FTP server.
+2. Login to the FTP server.
+3. List the remote directory.
+4. Create a directory on the FTP server.
+5. Upload a file to the FTP server.
+6. Change the current directory to the created directory.
+7. Print the current working directory.
+8. List the remote directory again.
+9. Download the file from the FTP server.
+10. Delete the file from the FTP server.
+11. Go to the parent directory.
+12. Print the current working directory.
+13. Remove the created directory from the FTP server.
+14. Rename a file on the FTP server.
+15. Access a file on the FTP server.
+16. Edit the file on the FTP server.
+17. Close the file on the FTP server.
+18. List the remote directory again.
+19. Get the file from the FTP server and check if its contents match the edited content.
+20. Remove the file from the FTP server.
+21. Close the FTP connection.
+
+At the end of the program, the FTP connection is closed and no files or directories are left on the server.
+
 ## References
 
 - [ESP-IDF Storage API](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/storage/spiffs.html#)
